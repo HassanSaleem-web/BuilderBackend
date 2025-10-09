@@ -243,7 +243,7 @@ Output plain printable UTF-8 only.
       {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "HTTP-Referer": "http://localhost:5173",
+          "HTTP-Referer": "https://builderassistant.onrender.com",
           "X-Title": "DigiStav Export (Grok)",
         },
         timeout: 60000,
