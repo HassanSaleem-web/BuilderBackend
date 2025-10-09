@@ -65,6 +65,7 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
 
     // 🧩 2️⃣ Create thread
     const thread = await openai.beta.threads.create();
+    console.log("threaddddd",thread);
 
     // 🧩 3️⃣ Build message with role context
     const roleContext = {
@@ -81,12 +82,26 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
     };
 
     const contentToSend = `
-You are a helpful assistant.
-Role Context: ${roleContext[role] || "General helper."}
-${language === "CS" ? "Please respond in Czech." : ""}
-User Message: "${message}"
-`;
-
+    You are a helpful assistant that validates and analyzes documents.
+    Always follow these rules:
+    
+    🟩 If the user's message includes words like "validate", "analyze", "review", or "check", then:
+    1. Perform the analysis.
+    2. Return your main response (summary) **followed by** a JSON array like this:
+    
+    [
+      {"status": "success", "text": "What was validated successfully"},
+      {"status": "error", "text": "What issues or missing elements were found"},
+      {"status": "warning", "text": "Any partial or uncertain validations"}
+    ]
+    
+    🟥 If the user's message does NOT request analysis, just respond normally (no JSON).
+    
+    Role Context: ${roleContext[role] || "General helper."}
+    ${language === "CS" ? "Please respond in Czech." : ""}
+    User Message: "${message}"
+    `;
+    
     // 🧩 4️⃣ Post message
     await openai.beta.threads.messages.create(thread.id, {
       role: "user",
@@ -99,6 +114,8 @@ User Message: "${message}"
       }),
     });
 
+    console.log("Hello I am here");
+
     // 🧩 5️⃣ Create a run
     if (!process.env.ASSISTANT_ID) {
       throw new Error("❌ Missing ASSISTANT_ID in environment variables.");
@@ -108,10 +125,17 @@ User Message: "${message}"
       assistant_id: process.env.ASSISTANT_ID,
     });
 
+    console.log("Now I am here")
+    console.log("run id", run.id);
+    console.log("thread id", thread.id);
+    
+
     // 🧩 6️⃣ Poll for completion
-    let runStatus = await openai.beta.threads.runs.retrieve(run.id, {
-      thread_id: thread.id,
-    });
+    let runStatus = await openai.beta.threads.runs.retrieve(
+      run.id,
+      { thread_id: thread.id }
+    );
+    //let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
 
     let attempts = 0;
     while (

@@ -8,7 +8,12 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["express", "openai", "backend", "assistant"],
+  "keywords": [
+    "express",
+    "openai",
+    "backend",
+    "assistant"
+  ],
   "author": "Hassan Cata",
   "license": "ISC",
   "dependencies": {
@@ -17,8 +22,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "multer": "1.4.5-lts.1",
-    "openai": "^4.68.4",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "openai": "^5.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
