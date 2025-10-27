@@ -77,10 +77,8 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
         "You are responding to a Site Manager. Use checklist-style instructions and prioritize readiness, safety, and version control.",
       Contractor:
         "You are responding to a Contractor. Focus on deliverables, compliance, and documentation handover clarity.",
-      Farmer:
-        "You are responding to a Farmer. Be simple, direct, and focused on subsidy eligibility and required paperwork.",
-    };
-
+      Tradesman: "You are responding to a Tradesman — an independent craftsman or small subcontractor who uses Validorix to create, check, and manage contracts, offers, or work agreements."
+    }
     const contentToSend = `
     You are a helpful assistant that validates and analyzes documents.
     Always follow these rules:
