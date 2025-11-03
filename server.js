@@ -9,9 +9,11 @@ import path from "path";
 dotenv.config();
 
 const app = express();
+const port = 5000;
 
-
-// CORS (place BEFORE routes)
+/* =========================
+   🔐 CORS (updated only)
+========================= */
 const allowedOrigins = [
   "https://builderassistant-3ml1.onrender.com",
   "http://localhost:5173",
@@ -21,34 +23,18 @@ const allowedOrigins = [
 app.use(
   cors({
     origin(origin, cb) {
-      // allow same-origin / non-browser tools with no Origin
+      // allow tools like curl/postman (no Origin) and your whitelisted origins
       if (!origin) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
       return cb(new Error("Not allowed by CORS"));
     },
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: false, // set to true ONLY if you use cookies across origins
+    credentials: false, // set to true only if you're using cookies across origins
   })
 );
-
-// Good practice: respond to all preflights
+// respond to preflight
 app.options("*", cors());
-
-// Optional: a health endpoint for Render
-app.get("/healthz", (_req, res) => res.status(200).send("ok"));
-
-// ... your routes ...
-
-/* =====================================================
-   🚀 Server Start  (Render needs process.env.PORT)
-===================================================== */
-const port = process.env.PORT || 5000;
-app.listen(port, "0.0.0.0", () => {
-  console.log(`🚀 Backend running on http://0.0.0.0:${port}`);
-  if (!process.env.ASSISTANT_ID)
-    console.error("⚠️ Missing ASSISTANT_ID in .env file!");
-});
 
 app.use(express.json());
 
@@ -103,7 +89,7 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
 
     // 🧩 2️⃣ Create thread
     const thread = await openai.beta.threads.create();
-    console.log("threaddddd",thread);
+    console.log("threaddddd", thread);
 
     // 🧩 3️⃣ Build message with role context
     const roleContext = {
@@ -115,8 +101,9 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
         "You are responding to a Site Manager. Use checklist-style instructions and prioritize readiness, safety, and version control.",
       Contractor:
         "You are responding to a Contractor. Focus on deliverables, compliance, and documentation handover clarity.",
-      Tradesman: "You are responding to a Tradesman — an independent craftsman or small subcontractor who uses Validorix to create, check, and manage contracts, offers, or work agreements."
-    }
+      Tradesman:
+        "You are responding to a Tradesman — an independent craftsman or small subcontractor who uses Validorix to create, check, and manage contracts, offers, or work agreements.",
+    };
     const contentToSend = `
     You are a helpful assistant that validates and analyzes documents.
     Always follow these rules:
@@ -161,17 +148,14 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
       assistant_id: process.env.ASSISTANT_ID,
     });
 
-    console.log("Now I am here")
+    console.log("Now I am here");
     console.log("run id", run.id);
     console.log("thread id", thread.id);
-    
 
     // 🧩 6️⃣ Poll for completion
-    let runStatus = await openai.beta.threads.runs.retrieve(
-      run.id,
-      { thread_id: thread.id }
-    );
-    //let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+    let runStatus = await openai.beta.threads.runs.retrieve(run.id, {
+      thread_id: thread.id,
+    });
 
     let attempts = 0;
     while (
@@ -215,8 +199,7 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
     console.error("💥 Error in /api/ask:", err);
     if (err.response?.status === 413) {
       return res.status(413).json({
-        reply:
-          "File too large — please upload files smaller than 20MB.",
+        reply: "File too large — please upload files smaller than 20MB.",
         results: [],
       });
     }
@@ -238,7 +221,12 @@ import axios from "axios";
 
 app.post("/api/export", async (req, res) => {
   try {
-    const { messages = [], analysisResults = [], role = "Investor", language = "EN" } = req.body;
+    const {
+      messages = [],
+      analysisResults = [],
+      role = "Investor",
+      language = "EN",
+    } = req.body;
 
     const sanitize = (s = "") =>
       String(s)
@@ -248,7 +236,8 @@ app.post("/api/export", async (req, res) => {
         .trim();
 
     const lastAssistant =
-      messages.slice().reverse().find((m) => m.role === "assistant")?.content || "";
+      messages.slice().reverse().find((m) => m.role === "assistant")
+        ?.content || "";
 
     const recent = messages
       .slice(-10)
@@ -310,7 +299,8 @@ Output plain printable UTF-8 only.
       }
     );
 
-    let summary = response?.data?.choices?.[0]?.message?.content?.trim() || "";
+    let summary =
+      response?.data?.choices?.[0]?.message?.content?.trim() || "";
 
     // fallback if empty
     if (!summary || summary.length < 20) {
@@ -323,12 +313,17 @@ Output plain printable UTF-8 only.
             ),
           ].join("\n")
         : "";
-      summary = `Summary:\n${base || "No assistant response available."}\n\n${resultsBlock}`;
+      summary = `Summary:\n${
+        base || "No assistant response available."
+      }\n\n${resultsBlock}`;
     }
 
     res.json({ summary });
   } catch (err) {
-    console.error("💥 Error in /api/export (Grok):", err.response?.data || err.message);
+    console.error(
+      "💥 Error in /api/export (Grok):",
+      err.response?.data || err.message
+    );
     res.status(500).json({ summary: "Failed to generate summary using Grok." });
   }
 });
