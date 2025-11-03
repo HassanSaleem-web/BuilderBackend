@@ -9,9 +9,47 @@ import path from "path";
 dotenv.config();
 
 const app = express();
-const port = 5000;
 
-app.use(cors());
+
+// CORS (place BEFORE routes)
+const allowedOrigins = [
+  "https://builderassistant-3ml1.onrender.com",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+app.use(
+  cors({
+    origin(origin, cb) {
+      // allow same-origin / non-browser tools with no Origin
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false, // set to true ONLY if you use cookies across origins
+  })
+);
+
+// Good practice: respond to all preflights
+app.options("*", cors());
+
+// Optional: a health endpoint for Render
+app.get("/healthz", (_req, res) => res.status(200).send("ok"));
+
+// ... your routes ...
+
+/* =====================================================
+   🚀 Server Start  (Render needs process.env.PORT)
+===================================================== */
+const port = process.env.PORT || 5000;
+app.listen(port, "0.0.0.0", () => {
+  console.log(`🚀 Backend running on http://0.0.0.0:${port}`);
+  if (!process.env.ASSISTANT_ID)
+    console.error("⚠️ Missing ASSISTANT_ID in .env file!");
+});
+
 app.use(express.json());
 
 /* =====================================================
@@ -265,7 +303,7 @@ Output plain printable UTF-8 only.
       {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "HTTP-Referer": "https://builderassistant.onrender.com",
+          "HTTP-Referer": "builderassistant-3ml1.onrender.com",
           "X-Title": "DigiStav Export (Grok)",
         },
         timeout: 60000,
