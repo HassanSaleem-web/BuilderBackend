@@ -251,7 +251,8 @@ if (threadId) {
     // 🧩 7️⃣ Fetch assistant reply
     const response = await openai.beta.threads.messages.list(thread.id);
     const latest = response.data.find((m) => m.role === "assistant");
-    const reply = latest?.content?.[0]?.text?.value || "No response received.";
+    let reply = latest?.content?.[0]?.text?.value || "No response received.";
+    
 
     // 🧩 8️⃣ Parse optional JSON results
     const match = reply.match(/\[.*?\]/s);
