@@ -263,7 +263,7 @@ if (threadId) {
         console.warn("⚠️ Could not parse JSON array.");
       }
     }
-
+    reply = reply.replace(match[0], "").trim();
     res.json({ reply, results: parsedResults, threadId });
 
   } catch (err) {
