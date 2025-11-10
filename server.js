@@ -5,7 +5,8 @@ import multer from "multer";
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
-
+import ExcelJS from "exceljs";
+import PDFDocument from "pdfkit";
 dotenv.config();
 
 const app = express();
@@ -37,7 +38,52 @@ app.use(
 app.options("*", cors());
 
 app.use(express.json());
+async function convertExcelToPdf(excelPath) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(excelPath);
 
+  const pdfPath = excelPath.replace(/\.(xlsx|xls)$/i, ".pdf");
+  const doc = new PDFDocument({ margin: 40 });
+  const stream = fs.createWriteStream(pdfPath);
+  doc.pipe(stream);
+
+  workbook.eachSheet((sheet, sheetId) => {
+    doc.fontSize(16).text(`Sheet ${sheetId}: ${sheet.name}`, { underline: true });
+    doc.moveDown(0.5);
+
+    sheet.eachRow((row, rowNumber) => {
+      const formattedCells = row.values
+        .filter((v) => v !== null && v !== undefined)
+        .map((v) => {
+          if (typeof v === "object" && v !== null) {
+            // Formula or rich cell objects
+            if (v.text) return v.text;
+            if (v.result) return v.result;
+            if (v.formula) return `=${v.formula}`;
+            return JSON.stringify(v);
+          }
+          return String(v);
+        });
+
+      const rowText = formattedCells.join("   |   ");
+
+      if (rowNumber === 1) {
+        doc.font("Helvetica-Bold").fontSize(11).text(rowText);
+        doc.moveDown(0.2);
+        doc.moveTo(doc.x, doc.y).lineTo(550, doc.y).stroke();
+        doc.moveDown(0.3);
+      } else {
+        doc.font("Helvetica").fontSize(10).text(rowText);
+      }
+    });
+
+    doc.addPage();
+  });
+
+  doc.end();
+  await new Promise((resolve) => stream.on("finish", resolve));
+  return pdfPath;
+}
 /* =====================================================
    🧱 Safe Multer Disk Storage (fixes 413 & memory issues)
 ===================================================== */
@@ -77,19 +123,43 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
         console.warn(`⚠️ Skipping oversized file: ${file.originalname}`);
         continue;
       }
-
-      const stream = fs.createReadStream(file.path);
+    
+      let filePath = file.path;
+    
+      // 🧾 If it's an Excel file, convert to PDF first
+      if (/\.(xlsx|xls)$/i.test(file.originalname)) {
+        try {
+          console.log(`📄 Converting ${file.originalname} to PDF...`);
+          filePath = await convertExcelToPdf(file.path);
+          fs.unlink(file.path, () => {}); // cleanup original Excel
+        } catch (err) {
+          console.error("❌ Excel→PDF conversion failed:", err);
+          continue; // skip file if conversion fails
+        }
+      }
+    
+      const stream = fs.createReadStream(filePath);
       const uploaded = await openai.files.create({
         file: stream,
         purpose: "assistants",
       });
       uploadedFileIds.push(uploaded.id);
-      fs.unlink(file.path, () => {}); // async cleanup
+    
+      fs.unlink(filePath, () => {}); // cleanup converted PDF
     }
+    
+   // 🧩 2️⃣ Reuse or create thread
+let { threadId } = req.body; // frontend will send it if continuing a chat
+let thread;
 
-    // 🧩 2️⃣ Create thread
-    const thread = await openai.beta.threads.create();
-    console.log("threaddddd", thread);
+if (threadId) {
+  console.log("♻️ Reusing existing thread:", threadId);
+  thread = { id: threadId };
+} else {
+  thread = await openai.beta.threads.create();
+  console.log("🆕 Created new thread:", thread.id);
+  threadId = thread.id;
+}
 
     // 🧩 3️⃣ Build message with role context
     const roleContext = {
@@ -194,7 +264,8 @@ app.post("/api/ask", upload.array("files"), async (req, res) => {
       }
     }
 
-    res.json({ reply, results: parsedResults });
+    res.json({ reply, results: parsedResults, threadId });
+
   } catch (err) {
     console.error("💥 Error in /api/ask:", err);
     if (err.response?.status === 413) {
